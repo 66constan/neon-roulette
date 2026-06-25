@@ -1,0 +1,33 @@
+{
+  "project_type": "game",
+  "platform": "flutter",
+  "colors": {
+    "primary": "#00F5FF",
+    "accent": "#FF00FF",
+    "background": "#0D0D0D",
+    "surface": "#1A1A2E",
+    "text": "#FFFFFF",
+    "success": "#00FF88",
+    "warning": "#FFD700",
+    "danger": "#FF3366",
+    "grid_normal": "#1A1A3E",
+    "grid_glow": "#00F5FF",
+    "grid_charging": "#FF00FF"
+  },
+  "typography": {
+    "font_family": "system-ui, -apple-system, sans-serif",
+    "display": "32px/700",
+    "heading": "20px/600",
+    "body": "14px/400"
+  },
+  "animation": {
+    "fast": "150ms ease",
+    "normal": "300ms ease",
+    "slow": "600ms ease-in-out",
+    "rule": "只用 transform 和 opacity，不触发 layout/paint"
+  },
+  "visual_approach": "CustomPainter 粒子 + 多层 glow 特效 + Unicode emoji + 无图片文件",
+  "no_component_library": true,
+  "no_ai_image_generation": true,
+  "codemagic_build_enabled": true
+}

@@ -16,8 +16,8 @@
 | G4: Phase 2 核心交互 | ✅ DONE | UI组件+主屏整合(1代理) |
 | G5: Phase 3 体验层 | ✅ DONE | 测试+README(1代理，发现并修复索引映射bug) |
 | G6: 审查验证 | ✅ DONE | 所有交付物通过审查 |
-| G7: GitHub Push | ⏳ PENDING | 代码推送至仓库 |
-| G8: Magic云构建 | ⏳ PENDING | APK/IPA/Web构建成功 |
+| G7: GitHub Push | ✅ DONE | https://github.com/66constan/neon-roulette |
+| G8: Magic云构建 | ⏳ PENDING | codemagic.yaml 已配置，需触发首次构建 |
 
 ---
 
