@@ -206,48 +206,34 @@ class _GameScreenState extends State<GameScreen> {
           SafeArea(
             child: Column(
               children: [
-                const SizedBox(height: 20),
-
-                // ---- Title area ----
-                const Text(
-                  'NEON ROULETTE',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 4.0,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  '夜店惩罚转盘',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.normal,
-                    color: Color(0xFF888888),
-                  ),
-                ),
-
-                // ---- 9-grid area ----
+                // ---- 9-grid area fills remaining space ----
                 Expanded(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      NeonGrid(
-                        highlightedIndex: _highlightedIndex,
-                        selectedIndex: selectedIndex,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                      child: AspectRatio(
+                        aspectRatio: 1.0,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            NeonGrid(
+                              highlightedIndex: _highlightedIndex,
+                              selectedIndex: selectedIndex,
+                            ),
+                            CenterButton(
+                              phase: phase,
+                              onLongPressStart: _onLongPressStart,
+                              onLongPressEnd: _onLongPressEnd,
+                              onTap: _onTap,
+                            ),
+                          ],
+                        ),
                       ),
-                      CenterButton(
-                        phase: phase,
-                        onLongPressStart: _onLongPressStart,
-                        onLongPressEnd: _onLongPressEnd,
-                        onTap: _onTap,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
 
                 // ---- Result area ----
                 if (currentPenalty != null) ...[
@@ -257,9 +243,7 @@ class _GameScreenState extends State<GameScreen> {
                     isVisible: phase == GamePhase.result ||
                         phase == GamePhase.picking,
                   ),
-                  const Spacer(),
-                ] else ...[
-                  const Spacer(),
+                  const SizedBox(height: 12),
                 ],
               ],
             ),
