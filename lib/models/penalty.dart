@@ -1,153 +1,72 @@
-import 'package:flutter/material.dart';
-
-/// 霓虹轮盘8种惩罚类型，按格子索引0-7排列。
+/// 8 penalties with weighted probability matching React source.
 enum PenaltyType {
-  freePass,      // 格子0: 纯免罚
-  freePassNext,  // 格子1: 免罚但下局加倍
-  kiss10s,       // 格子2: 舌吻十秒
-  crossArm,      // 格子3: 交杯酒
-  halfDrink,     // 格子4: 喝半杯
-  rockMe,        // 格子5: ROCK ME
-  fullDrink,     // 格子6: 喝一杯
-  kissReal,      // 格子7: KISS
+  allCheers,     // 0: 全场干杯 (FREE_PASS_1)
+  teaseSip,      // 1: 养鱼半杯 (HALF_DRINK_1)
+  bottomsUp,     // 2: 深水炸弹 (FULL_SHOT_1)
+  lapDance,      // 3: 贴身热舞 (LAP_DANCE_1) — needs partner
+  freePass,      // 4: 免死金牌 (FREE_PASS_2)
+  frenchKiss,    // 5: 法式湿吻 (KISS_1) — needs partner
+  dominator,     // 6: 绝对支配 (FREE_PASS_3)
+  bodySway,      // 7: 欲擒故纵 (ROCK_ME) — needs partner
 }
 
-/// 单个惩罚格子的完整数据模型。
 class Penalty {
   final PenaltyType type;
-  final String title;
-  final String subtitle;
-  final String fullText;
-  final Color themeColor;
-  final bool needsPicker;
-  final int timerSeconds;
+  final String emoji;        // emoji for grid display
+  final String colorHex;     // hex color for neon theme
+  final int weight;          // probability weight (out of 100)
+  final bool needsPartner;   // requires partner selection
 
   const Penalty({
     required this.type,
-    required this.title,
-    required this.subtitle,
-    required this.fullText,
-    required this.themeColor,
-    this.needsPicker = false,
-    this.timerSeconds = 0,
+    required this.emoji,
+    required this.colorHex,
+    required this.weight,
+    this.needsPartner = false,
   });
 
-  /// 返回8个格子的惩罚列表，按格子索引0-7排列（与PRD第7节映射一致）。
-  ///
-  /// 3×3 网格映射（跳过中心按钮位置）：
-  ///   [0]  [1]  [2]
-  ///   [3]   X   [4]
-  ///   [5]  [6]  [7]
-  /// 按 CEO 文档 9 宫格布局排列（0-7，跳过中心位置4）：
-  /// ```
-  /// [0:FREE PASS] [1:舌吻十秒] [2:交杯酒]
-  /// [3:喝半杯]    [  开始  ]  [4:ROCK ME]
-  /// [5:喝一杯]    [6:KISS]    [7:FREE PASS(下局加倍)]
-  /// ```
-  static List<Penalty> all() => const [
-        // 格子0: 纯免罚（左上）
-        Penalty(
-          type: PenaltyType.freePass,
-          title: 'FREE PASS',
-          subtitle: '运气真好，直接跳过',
-          fullText: '这一轮你直接跳过！',
-          themeColor: Color(0xFFFFD700),
-          needsPicker: false,
-          timerSeconds: 0,
-        ),
-        // 格子1: 舌吻十秒
-        Penalty(
-          type: PenaltyType.kiss10s,
-          title: '舌·吻·十·秒',
-          subtitle: '选一个人，开始',
-          fullText: '选一个人 — 十秒不能停',
-          themeColor: Color(0xFFFF1493),
-          needsPicker: true,
-          timerSeconds: 10,
-        ),
-        // 格子2: 交杯酒
-        Penalty(
-          type: PenaltyType.crossArm,
-          title: '交·杯·酒',
-          subtitle: '手臂交叉共饮',
-          fullText: '手臂交叉，选一人一起干',
-          themeColor: Color(0xFF00CFFF),
-          needsPicker: true,
-          timerSeconds: 10,
-        ),
-        // 格子3: 喝半杯
-        Penalty(
-          type: PenaltyType.halfDrink,
-          title: '喝·半·杯',
-          subtitle: '小惩大诫',
-          fullText: '来一口，小意思而已',
-          themeColor: Color(0xFFFFA500),
-          needsPicker: false,
-          timerSeconds: 0,
-        ),
-        // 格子4: ROCK ME（中右）
-        Penalty(
-          type: PenaltyType.rockMe,
-          title: 'ROCK ME',
-          subtitle: 'Lắc Lư · 坐上来',
-          fullText: '坐上去 — 摇啊摇，30秒',
-          themeColor: Color(0xFFFF8C69),
-          needsPicker: true,
-          timerSeconds: 10,
-        ),
-        // 格子5: 喝一杯（左下）
-        Penalty(
-          type: PenaltyType.fullDrink,
-          title: '喝·一·杯',
-          subtitle: '命运选中了你',
-          fullText: '干了它，不能留一滴！',
-          themeColor: Color(0xFFFF6B1A),
-          needsPicker: false,
-          timerSeconds: 0,
-        ),
-        // 格子6: KISS（下中）
-        Penalty(
-          type: PenaltyType.kissReal,
-          title: 'K · I · S · S',
-          subtitle: '选一人，嘴对嘴',
-          fullText: '选一个人 — 真·嘴·对·嘴',
-          themeColor: Color(0xFFFF2D7A),
-          needsPicker: true,
-          timerSeconds: 10,
-        ),
-        // 格子7: FREE PASS 下局加倍（右下）
-        Penalty(
-          type: PenaltyType.freePassNext,
-          title: 'FREE PASS',
-          subtitle: '下局加倍 ⚡',
-          fullText: '免了，但下一局惩罚加倍',
-          themeColor: Color(0xFFFFD700),
-          needsPicker: false,
-          timerSeconds: 0,
-        ),
-      ];
+  static const List<Penalty> all = [
+    // 0: 全场干杯 — everyone drinks together (weight 14)
+    Penalty(type: PenaltyType.allCheers,   emoji: '🥂', colorHex: '#FFD700', weight: 14),
+    // 1: 养鱼半杯 — tease sip (weight 14)
+    Penalty(type: PenaltyType.teaseSip,    emoji: '🍹', colorHex: '#FF9100', weight: 14),
+    // 2: 深水炸弹 — bottoms up (weight 12)
+    Penalty(type: PenaltyType.bottomsUp,   emoji: '🍺', colorHex: '#FF4500', weight: 12),
+    // 3: 贴身热舞 — lap dance (weight 12)
+    Penalty(type: PenaltyType.lapDance,    emoji: '💃', colorHex: '#E040FB', weight: 12, needsPartner: true),
+    // 4: 免死金牌 — free pass (weight 12)
+    Penalty(type: PenaltyType.freePass,    emoji: '🛡️', colorHex: '#FFD700', weight: 12),
+    // 5: 法式湿吻 — french kiss (weight 14)
+    Penalty(type: PenaltyType.frenchKiss,  emoji: '💋', colorHex: '#FF2D7A', weight: 14, needsPartner: true),
+    // 6: 绝对支配 — dominator (weight 10)
+    Penalty(type: PenaltyType.dominator,   emoji: '👑', colorHex: '#FFD700', weight: 10),
+    // 7: 欲擒故纵 — body sway (weight 12)
+    Penalty(type: PenaltyType.bodySway,    emoji: '🔄', colorHex: '#00CFFF', weight: 12, needsPartner: true),
+  ];
 
-  /// 按格子索引获取惩罚（0-7）。
-  static Penalty fromIndex(int index) => all()[index];
+  static Penalty fromIndex(int index) => all[index];
 
-  /// 创建一个副本，可覆盖 title/fullText（用于加倍文案）。
-  Penalty copyWith({
-    PenaltyType? type,
-    String? title,
-    String? subtitle,
-    String? fullText,
-    Color? themeColor,
-    bool? needsPicker,
-    int? timerSeconds,
-  }) {
-    return Penalty(
-      type: type ?? this.type,
-      title: title ?? this.title,
-      subtitle: subtitle ?? this.subtitle,
-      fullText: fullText ?? this.fullText,
-      themeColor: themeColor ?? this.themeColor,
-      needsPicker: needsPicker ?? this.needsPicker,
-      timerSeconds: timerSeconds ?? this.timerSeconds,
-    );
+  /// Weighted random index matching the React distribution.
+  static int rollIndex() {
+    final roll = _random.nextInt(100);
+    if (roll < 12) return 0;   // ALL_CHEERS (12%)
+    if (roll < 26) return 1;   // TEASE_SIP (14%)
+    if (roll < 38) return 2;   // BOTTOMS_UP (12%)
+    if (roll < 50) return 3;   // LAP_DANCE (12%)
+    if (roll < 62) return 4;   // FREE_PASS (12%)
+    if (roll < 76) return 5;   // KISS (14%)
+    if (roll < 88) return 6;   // DOMINATOR (12%)
+    return 7;                   // BODY_SWAY (12%)
+  }
+}
+
+final _random = _SimpleRandom();
+
+/// Minimal Deterministic-compatible random.
+class _SimpleRandom {
+  int _seed = DateTime.now().microsecondsSinceEpoch;
+  int nextInt(int max) {
+    _seed = (_seed * 1103515245 + 12345) & 0x7fffffff;
+    return _seed % max;
   }
 }

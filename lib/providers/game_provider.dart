@@ -1,205 +1,339 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 import '../models/game_state.dart';
 import '../models/penalty.dart';
-import '../models/player.dart';
+import '../services/audio_synth.dart';
+import '../services/haptic_service.dart';
+import '../i18n/translations.dart';
 
-/// 霓虹轮盘游戏状态机，基于 [ChangeNotifier]。
+/// Central game state machine for Neon Roulette.
 ///
-/// 生命周期:
-///   idle → charging → spinning → stopping → result → (picking → result) → idle
-///
-/// API 契约（供 Phase 1B 和 Phase 2 使用）:
-///   - provider.state.phase: GamePhase
-///   - provider.state.currentPenalty: Penalty?
-///   - provider.state.selectedIndex: int?
-///   - provider.state.nextRoundMultiplier: double
-///   - provider.players: List<Player>
-///   - provider.startCharging()
-///   - provider.stopChargingAndSpin()
-///   - provider.selectPlayer(Player)
-///   - provider.nextRound()
-///   - provider.getEffectivePenalty(Penalty): Penalty
+/// Manages: charging → spinning → result cycle,
+/// programmatic audio via [AudioSynth], persistent settings, i18n.
 class GameProvider extends ChangeNotifier {
-  final Random _random = Random();
+  GameProvider() {
+    _loadSettings();
+  }
 
   // ===========================================================================
-  // State
+  // Core state
   // ===========================================================================
-
   GameState _state = GameState.initial();
-
-  /// 当前游戏状态快照。
   GameState get state => _state;
 
-  // ===========================================================================
-  // Players
-  // ===========================================================================
+  final AudioSynth synth = AudioSynth();
+  final AudioPlayer _player = AudioPlayer();
+  final Random _random = Random();
 
-  List<Player> _players = Player.defaultPlayers();
+  // I18n
+  I18n _i18n = const I18n('zh');
+  I18n get i18n => _i18n;
 
-  /// 当前玩家列表。
-  List<Player> get players => List.unmodifiable(_players);
+  // Settings
+  bool _soundEnabled = true;
+  bool get soundEnabled => _soundEnabled;
+
+  // Custom penalty names (index -> custom name)
+  final Map<int, String> _customNames = {};
+
+  // Spin animation control
+  bool _isSpinning = false;
+  bool get isSpinning => _isSpinning;
+  Timer? _chargeTimer;
+  DateTime? _chargeStart;
+
+  // BGM
+  Timer? _bgmTimer;
+  int _bgmBeat = 0;
+
+  // History
+  List<RoundRecord> get history => _state.history;
 
   // ===========================================================================
-  // Transition: idle → charging
+  // Settings persistence
   // ===========================================================================
+  void _loadSettings() {
+    // Load settings from local storage would go here.
+    // For now, defaults (ZH, sound on).
+  }
 
-  /// 用户开始长按中心按钮，进入蓄力阶段。
+  void _saveSettings() {
+    // Persist settings
+  }
+
+  void setLocale(String locale) {
+    _i18n = I18n(locale);
+    _saveSettings();
+    notifyListeners();
+  }
+
+  void toggleSound() {
+    _soundEnabled = !_soundEnabled;
+    synth.setVolume(_soundEnabled ? 0.5 : 0.0);
+    _saveSettings();
+    notifyListeners();
+  }
+
+  void setCustomName(int index, String name) {
+    _customNames[index] = name;
+    _saveSettings();
+  }
+
+  String getCustomName(int index) => _customNames[index] ?? _i18n.penaltyTitle(index);
+
+  // ===========================================================================
+  // Charging phase
+  // ===========================================================================
   void startCharging() {
+    if (_isSpinning) return;
     _state = _state.copyWith(
       phase: GamePhase.charging,
+      chargeProgress: 0.0,
+      orbCount: 0,
+      isFullCharge: false,
       clearSelectedIndex: true,
-      clearCurrentPenalty: true,
+      clearHighlightedIndex: true,
     );
-    notifyListeners();
+    _chargeStart = DateTime.now();
+    HapticService.light();
+
+    _chargeTimer?.cancel();
+    _chargeTimer = Timer.periodic(const Duration(milliseconds: 45), (_) {
+      if (_chargeStart == null) return;
+      final elapsed = DateTime.now().difference(_chargeStart!).inMilliseconds;
+      final progress = (elapsed / 1500).clamp(0.0, 1.0);
+      final orbs = progress > 0.99 ? 3 : progress > 0.66 ? 2 : progress > 0.33 ? 1 : 0;
+      final full = progress >= 1.0;
+
+      _playChargeClick(progress);
+
+      if (orbs > _state.orbCount) {
+        _playDing();
+        HapticService.medium();
+      }
+
+      // Full charge — auto release
+      if (full) {
+        _chargeTimer?.cancel();
+        _chargeTimer = null;
+        _state = _state.copyWith(
+          chargeProgress: 1.0,
+          orbCount: 3,
+          isFullCharge: true,
+        );
+        notifyListeners();
+        HapticService.heavy();
+        // Auto-release after a moment
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (_state.phase == GamePhase.charging) {
+            stopChargingAndSpin();
+          }
+        });
+        return;
+      }
+
+      _state = _state.copyWith(
+        chargeProgress: progress,
+        orbCount: orbs,
+      );
+      notifyListeners();
+    });
   }
 
-  // ===========================================================================
-  // Transition: charging → spinning
-  // ===========================================================================
+  void stopChargingAndSpin() {
+    _chargeTimer?.cancel();
+    _chargeTimer = null;
 
-  /// 用户松手，随机选 0-7 索引，进入旋转阶段。
-  ///
-  /// 旋转动画的实际延迟和跳格由 widget 层管理。widget 应在约 2 秒后调用
-  /// [onSpinComplete]。
-  ///
-  /// 如果提供 [targetIndex]，则使用该索引（用于测试）。
-  void stopChargingAndSpin({int? targetIndex}) {
-    final index = targetIndex ?? _random.nextInt(8);
+    if (_state.phase != GamePhase.charging) return;
+
+    final elapsed = _chargeStart != null
+        ? DateTime.now().difference(_chargeStart!).inMilliseconds
+        : 500;
+    final chargeVal = (elapsed / 1500).clamp(0.18, 1.0);
+
     _state = _state.copyWith(
       phase: GamePhase.spinning,
-      selectedIndex: index, // 临时记录目标索引（widget 可用它做动画）
+      chargeProgress: chargeVal,
+      isFullCharge: chargeVal >= 1.0,
     );
     notifyListeners();
+
+    _startSpin(chargeVal);
+    _chargeStart = null;
+  }
+
+  void cancelCharge() {
+    _chargeTimer?.cancel();
+    _chargeTimer = null;
+    _chargeStart = null;
+    if (_state.phase == GamePhase.charging) {
+      _state = _state.copyWith(
+        phase: GamePhase.idle,
+        chargeProgress: 0.0,
+        orbCount: 0,
+      );
+      notifyListeners();
+    }
   }
 
   // ===========================================================================
-  // Transition: spinning → stopping → result
+  // Spin phase
   // ===========================================================================
+  int? _spinTarget;
+  int _spinStep = 0;
+  int _totalSteps = 0;
+  Timer? _spinTimer;
 
-  /// Widget 层在旋转动画完成后调用此方法。
-  ///
-  /// 设置最终停格位置、当前惩罚，并根据 [Penalty.needsPicker] 决定是否进入
-  /// picking 阶段。
-  void _onSpinComplete(int index) {
-    final penalty = Penalty.fromIndex(index);
+  void _startSpin(double chargeVal) {
+    if (_isSpinning) return;
+    _isSpinning = true;
+    _spinTarget = Penalty.rollIndex();
+    _spinStep = 0;
+    _totalSteps = 8 + (chargeVal * 25).round() + _spinTarget!;
+    int idx = _random.nextInt(8);
 
-    _state = _state.copyWith(
-      phase: GamePhase.stopping,
-      selectedIndex: index,
-      currentPenalty: penalty,
-    );
+    int delayMs = (80 - chargeVal * 60).round().clamp(10, 80);
 
-    // 短暂延迟后进入 result（widget 层管理延迟）
-    _state = _state.copyWith(
-      phase: GamePhase.result,
-      streakCount: _state.streakCount + 1,
-    );
+    _playSlotMachineSound();
+    HapticService.medium();
 
-    // 如果需要挑人则进入 picking
-    if (penalty.needsPicker) {
-      _state = _state.copyWith(phase: GamePhase.picking);
+    void tickLoop() {
+      idx = (idx + 1) % 8;
+      _spinStep++;
+
+      _state = _state.copyWith(highlightedIndex: idx);
+      notifyListeners();
+
+      _playTick();
+      HapticService.selection();
+
+      final remaining = _totalSteps - _spinStep;
+
+      if (remaining <= 0 && idx == _spinTarget) {
+        // Done
+        _stopSlotMachineSound();
+        _isSpinning = false;
+        _spinTimer = null;
+
+        _state = _state.copyWith(
+          phase: GamePhase.result,
+          selectedIndex: idx,
+          highlightedIndex: null,
+          streakCount: _state.streakCount + 1,
+        );
+
+        // Determine sound effect
+        final penType = Penalty.fromIndex(idx).type;
+        if (penType == PenaltyType.allCheers) {
+          _playVinaDrop();
+          _state = _state.copyWith(showStrobe: true);
+        } else if (penType == PenaltyType.dominator || penType == PenaltyType.freePass) {
+          _playWinnerCheer();
+        } else {
+          _playSuccess();
+        }
+
+        HapticService.heavy();
+        notifyListeners();
+
+        // Auto clear strobe
+        if (_state.showStrobe) {
+          Future.delayed(const Duration(seconds: 8), () {
+            _state = _state.copyWith(showStrobe: false);
+            notifyListeners();
+          });
+        }
+      } else {
+        // Deceleration
+        if (remaining < 2) {
+          delayMs += 120;
+        } else if (remaining < 4) {
+          delayMs += 50;
+        } else if (remaining < 9) {
+          delayMs += 15;
+        } else if (_spinStep < 5) {
+          delayMs = (delayMs - 5).clamp(10, delayMs);
+        }
+        _spinTimer = Timer(Duration(milliseconds: delayMs), tickLoop);
+      }
     }
 
-    notifyListeners();
-  }
-
-  /// Widget 层调用的公开入口 —— 等同于 _onSpinComplete。
-  void onSpinComplete(int index) {
-    _onSpinComplete(index);
+    _spinTimer = Timer(Duration(milliseconds: delayMs), tickLoop);
   }
 
   // ===========================================================================
-  // Picking phase
+  // Reset
   // ===========================================================================
-
-  /// 用户在 picking 阶段选中某个玩家，返回 result 阶段。
-  void selectPlayer(Player player) {
-    if (_state.phase != GamePhase.picking) return;
-    _state = _state.copyWith(phase: GamePhase.result);
-    notifyListeners();
-  }
-
-  /// 挑人倒计时超时，自动随机选人。
-  void onPickTimeout() {
-    if (_state.phase != GamePhase.picking) return;
-    if (_players.isEmpty) return;
-    final randomPlayer = _players[_random.nextInt(_players.length)];
-    _state = _state.copyWith(phase: GamePhase.result);
-    notifyListeners();
-  }
-
-  // ===========================================================================
-  // Transition: result → idle (再来一局)
-  // ===========================================================================
-
-  /// 进入下一局。
-  ///
-  /// - 如果上一局的 [Penalty] 是 [PenaltyType.freePassNext]，设置
-  ///   [nextRoundMultiplier] = 2.0。
-  /// - 否则重置 [nextRoundMultiplier] 为 1.0。
-  /// - 清除 selectedIndex 和 currentPenalty。
   void nextRound() {
-    final wasFreePassNext =
-        _state.currentPenalty?.type == PenaltyType.freePassNext;
-
+    _spinTarget = null;
+    _spinStep = 0;
     _state = _state.copyWith(
       phase: GamePhase.idle,
+      chargeProgress: 0.0,
+      orbCount: 0,
+      isFullCharge: false,
       clearSelectedIndex: true,
-      clearCurrentPenalty: true,
-      nextRoundMultiplier: wasFreePassNext ? 2.0 : 1.0,
+      clearHighlightedIndex: true,
     );
     notifyListeners();
   }
 
-  // ===========================================================================
-  // Full reset
-  // ===========================================================================
-
-  /// 完全重置游戏状态（清空连击、重置玩家列表等）。
-  void resetGame() {
-    _state = GameState.initial();
-    _players = Player.defaultPlayers();
+  void addToHistory(RoundRecord record) {
+    _state = _state.copyWith(history: [..._state.history, record]);
     notifyListeners();
   }
 
   // ===========================================================================
-  // Multiplier helpers
+  // Audio helpers
   // ===========================================================================
+  void _playBytes(Uint8List bytes) async {
+    if (!_soundEnabled) return;
+    try {
+      await _player.play(BytesSource(bytes));
+    } catch (_) {}
+  }
 
-  /// 根据当前 [nextRoundMultiplier] 返回调整后文案的 [Penalty]。
-  ///
-  /// 当 multiplier > 1.0 时，title 和 fullText 会调整以反映加倍效果
-  /// （如 "喝半杯" → "喝一杯"、"喝一杯" → "喝两杯"）。
-  Penalty getEffectivePenalty(Penalty p) {
-    if (_state.nextRoundMultiplier <= 1.0) return p;
+  void _playTick() => _playBytes(synth.tick());
+  void _playDing() => _playBytes(synth.ding());
+  void _playSuccess() => _playBytes(synth.success());
+  void _playWinnerCheer() => _playBytes(synth.winnerCheer());
+  void _playVinaDrop() => _playBytes(synth.vinaHouseDrop());
+  void _playSlotMachineSound() => _playBytes(synth.slotMachineSpin());
+  void _stopSlotMachineSound() {}
+  void _playChargeClick(double p) => _playBytes(synth.chargeClick(p));
 
-    // 构建加倍后的文案
-    String adjustedTitle = p.title;
-    String adjustedFullText = p.fullText;
+  // ===========================================================================
+  // BGM
+  // ===========================================================================
+  void startBgm() {
+    _bgmTimer?.cancel();
+    _bgmBeat = 0;
+    final bassNotes = [55.0, 48.99, 65.41, 58.27];
 
-    if (_state.nextRoundMultiplier == 2.0) {
-      // 半杯 → 一杯
-      if (p.type == PenaltyType.halfDrink) {
-        adjustedTitle = '喝·一·杯';
-        adjustedFullText = '干了它，不能留一滴！';
+    _bgmTimer = Timer.periodic(const Duration(milliseconds: 450), (_) {
+      _playBytes(synth.bgmKick());
+      if (_bgmBeat % 2 == 0) {
+        _playBytes(synth.bgmBass(bassNotes[(_bgmBeat ~/ 2) % bassNotes.length]));
       }
-      // 一杯 → 两杯
-      if (p.type == PenaltyType.fullDrink) {
-        adjustedTitle = '喝·两·杯';
-        adjustedFullText = '双倍命运 — 两杯干了！';
-      }
-    } else if (_state.nextRoundMultiplier >= 4.0) {
-      adjustedTitle = '${p.title} ×${_state.nextRoundMultiplier.toInt()}';
-      adjustedFullText = '加倍惩罚！${p.fullText}';
-    }
+      _bgmBeat = (_bgmBeat + 1) % 8;
+    });
+  }
 
-    return p.copyWith(
-      title: adjustedTitle,
-      fullText: adjustedFullText,
-    );
+  void stopBgm() {
+    _bgmTimer?.cancel();
+    _bgmTimer = null;
+  }
+
+  @override
+  void dispose() {
+    _chargeTimer?.cancel();
+    _spinTimer?.cancel();
+    _bgmTimer?.cancel();
+    _player.dispose();
+    super.dispose();
   }
 }

@@ -1,7 +1,7 @@
 name: neon_roulette
-description: 霓虹轮盘 - 夜店惩罚转盘游戏
+description: Neon Roulette — party drinking game
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.0+1
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -16,9 +16,6 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.1
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/audio/

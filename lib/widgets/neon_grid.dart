@@ -1,180 +1,113 @@
 import 'package:flutter/material.dart';
 import '../models/penalty.dart';
 import '../theme/neon_theme.dart';
+import '../providers/game_provider.dart';
+import '../i18n/translations.dart';
 
-/// Emoji + label for each penalty cell.
-const Map<int, String> _penaltyEmoji = {
-  0: '🎉',  // FREE PASS (纯免罚)
-  1: '💋',  // 舌吻十秒
-  2: '🍸',  // 交杯酒
-  3: '🥃',  // 喝半杯
-  4: '💃',  // ROCK ME
-  5: '🍺',  // 喝一杯
-  6: '💋',  // KISS
-  7: '🎉',  // FREE PASS (下局加倍)
-};
-
-// =============================================================================
-// NeonGrid — the 3×3 penalty grid
-// =============================================================================
-
-/// A 3×3 grid of penalty cells with a hole for the center button.
-///
-/// The grid has 9 positions (3 cols × 3 rows) but only 8 hold penalty cells.
-/// The center slot (row 1, col 1 / flat index 4) is intentionally left empty
-/// so that [CenterButton] can be overlaid on top.
+/// 3×3 penalty grid with center spin button.
 class NeonGrid extends StatelessWidget {
-  /// The penalty index (0-7) currently highlighted during the spin animation.
-  final int? highlightedIndex;
+  final GameProvider provider;
 
-  /// The penalty index (0-7) that was selected as the final result.
-  /// When set, only this cell glows strongly; all others dim.
-  final int? selectedIndex;
-
-  /// Callback when a penalty cell is tapped (reserved for future use).
-  final VoidCallback? onCellTap;
-
-  const NeonGrid({
-    super.key,
-    this.highlightedIndex,
-    this.selectedIndex,
-    this.onCellTap,
-  });
+  const NeonGrid({super.key, required this.provider});
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(8.0),
-      // 9 children: 8 penalties + 1 empty center placeholder.
-      children: List.generate(9, (flatIndex) {
-        // Center slot (flat index 4) is always empty.
-        if (flatIndex == 4) {
-          return const SizedBox.shrink();
-        }
+    final state = provider.state;
+    final i18n = provider.i18n;
 
-        // Map flat index to penalty index.
-        final penaltyIndex = flatIndex < 4 ? flatIndex : flatIndex - 1;
-        final penalty = Penalty.fromIndex(penaltyIndex);
+    // React grid layout (index mapping):
+    // Top:    0(ALL_CHEERS)  1(TEASE_SIP)  2(BOTTOMS_UP)
+    // Mid:    7(BODY_SWAY)   [CENTER]      3(LAP_DANCE)
+    // Bot:    6(DOMINATOR)   5(FRENCH_KISS) 4(FREE_PASS)
+    const gridOrder = [0, 1, 2, 7, -1, 3, 6, 5, 4];
 
-        // Highlight logic.
-        final isHighlighted = highlightedIndex == penaltyIndex;
-        final isSelected = selectedIndex == penaltyIndex;
+    return AspectRatio(
+      aspectRatio: 1.0,
+      child: GridView.count(
+        crossAxisCount: 3,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(6),
+        mainAxisSpacing: 6,
+        crossAxisSpacing: 6,
+        children: List.generate(9, (flat) {
+          final idx = gridOrder[flat];
+          if (idx == -1) return const SizedBox.shrink(); // center slot
 
-        // If a result has been selected, only that cell stays bright;
-        // all others dim unless they are the selected one.
-        final dimmed = selectedIndex != null && !isSelected;
+          final penalty = Penalty.fromIndex(idx);
+          final color = parseHex(penalty.colorHex);
+          final isHighlighted = state.highlightedIndex == idx;
+          final isSelected = state.selectedIndex == idx;
+          final dimmed = state.selectedIndex != null && !isSelected;
 
-        return _PenaltyCell(
-          penalty: penalty,
-          penaltyIndex: penaltyIndex,
-          isHighlighted: isHighlighted,
-          isSelected: isSelected,
-          dimmed: dimmed,
-          onTap: onCellTap,
-        );
-      }),
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            decoration: BoxDecoration(
+              color: surfaceDark.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isSelected
+                    ? color
+                    : isHighlighted
+                        ? color.withValues(alpha: 0.7)
+                        : color.withValues(alpha: 0.15),
+                width: isSelected ? 2.5 : isHighlighted ? 2.0 : 1.0,
+              ),
+              boxShadow: isSelected
+                  ? neonGlowIntense(color)
+                  : isHighlighted
+                      ? neonGlow(color, blur: 18)
+                      : null,
+            ),
+            child: _buildCellContent(penalty, idx, isHighlighted, isSelected, dimmed, i18n),
+          );
+        }),
+      ),
     );
   }
-}
 
-// =============================================================================
-// _PenaltyCell — single penalty cell inside the grid
-// =============================================================================
+  Widget _buildCellContent(Penalty penalty, int idx, bool isHighlighted, bool isSelected, bool dimmed, I18n i18n) {
+    final color = parseHex(penalty.colorHex);
+    final opacity = dimmed ? 0.3 : 1.0;
+    final title = penalty.type == PenaltyType.dominator
+        ? '👑'
+        : penalty.type == PenaltyType.freePass
+            ? '🛡️'
+            : penalty.type == PenaltyType.bodySway
+                ? '🔄'
+                : penalty.emoji;
 
-class _PenaltyCell extends StatelessWidget {
-  final Penalty penalty;
-  final int penaltyIndex;
-  final bool isHighlighted;
-  final bool isSelected;
-  final bool dimmed;
-  final VoidCallback? onTap;
-
-  const _PenaltyCell({
-    required this.penalty,
-    required this.penaltyIndex,
-    required this.isHighlighted,
-    required this.isSelected,
-    required this.dimmed,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final themeColor = penaltyColor(penalty.type);
-    final emoji = _penaltyEmoji[penaltyIndex] ?? '❓';
-
-    // Determine glow strength.
-    double glowAlpha;
-    double blurRadius;
-    if (isSelected) {
-      glowAlpha = 0.9;
-      blurRadius = 20.0;
-    } else if (isHighlighted) {
-      glowAlpha = 0.7;
-      blurRadius = 16.0;
-    } else {
-      glowAlpha = 0.2;
-      blurRadius = 6.0;
-    }
-
-    final cellOpacity = dimmed ? 0.35 : 1.0;
-
-    return Padding(
-      padding: const EdgeInsets.all(4.0),
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 300),
-          opacity: cellOpacity,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: BoxDecoration(
-              color: surface.withValues(alpha: 0.75),
-              borderRadius: BorderRadius.circular(12.0),
-              border: Border.all(
-                color: themeColor.withValues(alpha: glowAlpha),
-                width: isSelected || isHighlighted ? 2.0 : 1.0,
-              ),
-              boxShadow: neonGlow(
-                themeColor,
-                blurRadius: blurRadius,
-              ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  emoji,
-                  style: TextStyle(
-                    fontSize: 24,
-                    shadows: [
-                      Shadow(
-                        color: themeColor.withValues(alpha: glowAlpha),
-                        blurRadius: 8.0,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  penalty.title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    height: 1.2,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+    return Opacity(
+      opacity: opacity,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: isSelected ? 34 : isHighlighted ? 30 : 26,
+              shadows: isSelected || isHighlighted
+                  ? [Shadow(color: color, blurRadius: 12)]
+                  : null,
             ),
           ),
-        ),
+          const SizedBox(height: 2),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Text(
+              i18n.penaltyTitle(idx),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: isSelected ? 13 : 11,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                shadows: isSelected ? [Shadow(color: color, blurRadius: 8)] : null,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

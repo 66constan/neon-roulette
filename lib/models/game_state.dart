@@ -1,67 +1,90 @@
 import 'penalty.dart';
 
-/// 游戏阶段状态机枚举。
+/// Game phases matching the React state machine.
 enum GamePhase {
-  /// 空闲状态，等待用户开始。
   idle,
-
-  /// 用户长按中心按钮蓄力中。
-  charging,
-
-  /// 转盘旋转动画进行中。
-  spinning,
-
-  /// 旋转即将停止（减速阶段最后一步）。
-  stopping,
-
-  /// 结果显示阶段。
-  result,
-
-  /// 需要挑选玩家（倒计时中）。
-  picking,
+  charging,   // long-press charging
+  spinning,   // grid cycling
+  result,     // showing result
 }
 
-/// 不可变的游戏状态快照，通过 [copyWith] 产生新状态。
+/// Record of a single spin result.
+class RoundRecord {
+  final DateTime timestamp;
+  final int gridIndex;
+  final PenaltyType type;
+  final String title;
+  final String subtitle;
+  final String description;
+
+  const RoundRecord({
+    required this.timestamp,
+    required this.gridIndex,
+    required this.type,
+    required this.title,
+    required this.subtitle,
+    required this.description,
+  });
+}
+
+/// Snapshot of the full game state.
 class GameState {
   final GamePhase phase;
-  final int? selectedIndex;
-  final Penalty? currentPenalty;
-  final double nextRoundMultiplier;
-  final int streakCount;
+  final int? highlightedIndex;  // index lighting up during spin
+  final int? selectedIndex;     // final stop index
+  final double chargeProgress;  // 0.0 - 1.0
+  final int orbCount;           // 0-3 charged orbs
+  final int streakCount;        // consecutive spins
+  final bool isFullCharge;      // charge reached 100%
+  final bool showStrobe;        // WINNER_A strobe flash
+  final List<RoundRecord> history;
+
+  const GameState.initial()
+      : phase = GamePhase.idle,
+        highlightedIndex = null,
+        selectedIndex = null,
+        chargeProgress = 0.0,
+        orbCount = 0,
+        streakCount = 0,
+        isFullCharge = false,
+        showStrobe = false,
+        history = const [];
 
   const GameState({
-    required this.phase,
+    this.phase = GamePhase.idle,
+    this.highlightedIndex,
     this.selectedIndex,
-    this.currentPenalty,
-    this.nextRoundMultiplier = 1.0,
+    this.chargeProgress = 0.0,
+    this.orbCount = 0,
     this.streakCount = 0,
+    this.isFullCharge = false,
+    this.showStrobe = false,
+    this.history = const [],
   });
-
-  /// 初始空闲状态。
-  factory GameState.initial() => const GameState(
-        phase: GamePhase.idle,
-        nextRoundMultiplier: 1.0,
-        streakCount: 0,
-      );
 
   GameState copyWith({
     GamePhase? phase,
+    int? highlightedIndex,
+    bool clearHighlightedIndex = false,
     int? selectedIndex,
-    Penalty? currentPenalty,
-    double? nextRoundMultiplier,
-    int? streakCount,
     bool clearSelectedIndex = false,
-    bool clearCurrentPenalty = false,
+    double? chargeProgress,
+    int? orbCount,
+    int? streakCount,
+    bool? isFullCharge,
+    bool? showStrobe,
+    List<RoundRecord>? history,
   }) {
     return GameState(
       phase: phase ?? this.phase,
-      selectedIndex:
-          clearSelectedIndex ? null : (selectedIndex ?? this.selectedIndex),
-      currentPenalty: clearCurrentPenalty
-          ? null
-          : (currentPenalty ?? this.currentPenalty),
-      nextRoundMultiplier: nextRoundMultiplier ?? this.nextRoundMultiplier,
+      highlightedIndex: clearHighlightedIndex ? null : (highlightedIndex ?? this.highlightedIndex),
+      selectedIndex: clearSelectedIndex ? null : (selectedIndex ?? this.selectedIndex),
+      chargeProgress: chargeProgress ?? this.chargeProgress,
+      orbCount: orbCount ?? this.orbCount,
       streakCount: streakCount ?? this.streakCount,
+      isFullCharge: isFullCharge ?? this.isFullCharge,
+      showStrobe: showStrobe ?? this.showStrobe,
+      history: history ?? this.history,
     );
   }
 }
