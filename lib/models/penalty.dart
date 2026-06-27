@@ -1,72 +1,62 @@
-/// 8 penalties with weighted probability matching React source.
+import 'dart:math';
+
+/// 8 penalty types.
 enum PenaltyType {
-  allCheers,     // 0: 全场干杯 (FREE_PASS_1)
-  teaseSip,      // 1: 养鱼半杯 (HALF_DRINK_1)
-  bottomsUp,     // 2: 深水炸弹 (FULL_SHOT_1)
-  lapDance,      // 3: 贴身热舞 (LAP_DANCE_1) — needs partner
-  freePass,      // 4: 免死金牌 (FREE_PASS_2)
-  frenchKiss,    // 5: 法式湿吻 (KISS_1) — needs partner
-  dominator,     // 6: 绝对支配 (FREE_PASS_3)
-  bodySway,      // 7: 欲擒故纵 (ROCK_ME) — needs partner
+  allCheers,    // 0: 全场干杯 (10%)
+  teaseSip,     // 1: 养鱼半杯 (30%)
+  bottomsUp,    // 2: 深水炸弹 (4%)
+  lapDance,     // 3: 贴身热舞 (4%)
+  freePass,     // 4: 免死金牌 (40%)
+  frenchKiss,   // 5: 法式湿吻 (4%)
+  dominator,    // 6: 绝对支配 (4%)
+  bodySway,     // 7: 欲擒故纵 (4%)
 }
 
 class Penalty {
   final PenaltyType type;
-  final String emoji;        // emoji for grid display
-  final String colorHex;     // hex color for neon theme
-  final int weight;          // probability weight (out of 100)
-  final bool needsPartner;   // requires partner selection
+  final String emoji;
 
   const Penalty({
     required this.type,
     required this.emoji,
-    required this.colorHex,
-    required this.weight,
-    this.needsPartner = false,
   });
 
+  static const List<String> colors = [
+    '#FFD700',   // 0: 全场干杯 (金)
+    '#FF9100',   // 1: 养鱼半杯 (橙)
+    '#FF4500',   // 2: 深水炸弹 (红橙)
+    '#E040FB',   // 3: 贴身热舞 (紫)
+    '#FFD700',   // 4: 免死金牌 (金)
+    '#FF2D7A',   // 5: 法式湿吻 (粉)
+    '#FFD700',   // 6: 绝对支配 (金)
+    '#00CFFF',   // 7: 欲擒故纵 (青)
+  ];
+
+  static String colorHex(int index) => colors[index];
+
   static const List<Penalty> all = [
-    // 0: 全场干杯 — everyone drinks together (weight 14)
-    Penalty(type: PenaltyType.allCheers,   emoji: '🥂', colorHex: '#FFD700', weight: 14),
-    // 1: 养鱼半杯 — tease sip (weight 14)
-    Penalty(type: PenaltyType.teaseSip,    emoji: '🍹', colorHex: '#FF9100', weight: 14),
-    // 2: 深水炸弹 — bottoms up (weight 12)
-    Penalty(type: PenaltyType.bottomsUp,   emoji: '🍺', colorHex: '#FF4500', weight: 12),
-    // 3: 贴身热舞 — lap dance (weight 12)
-    Penalty(type: PenaltyType.lapDance,    emoji: '💃', colorHex: '#E040FB', weight: 12, needsPartner: true),
-    // 4: 免死金牌 — free pass (weight 12)
-    Penalty(type: PenaltyType.freePass,    emoji: '🛡️', colorHex: '#FFD700', weight: 12),
-    // 5: 法式湿吻 — french kiss (weight 14)
-    Penalty(type: PenaltyType.frenchKiss,  emoji: '💋', colorHex: '#FF2D7A', weight: 14, needsPartner: true),
-    // 6: 绝对支配 — dominator (weight 10)
-    Penalty(type: PenaltyType.dominator,   emoji: '👑', colorHex: '#FFD700', weight: 10),
-    // 7: 欲擒故纵 — body sway (weight 12)
-    Penalty(type: PenaltyType.bodySway,    emoji: '🔄', colorHex: '#00CFFF', weight: 12, needsPartner: true),
+    Penalty(type: PenaltyType.allCheers,  emoji: '🥂'),
+    Penalty(type: PenaltyType.teaseSip,   emoji: '🍹'),
+    Penalty(type: PenaltyType.bottomsUp,  emoji: '🍺'),
+    Penalty(type: PenaltyType.lapDance,   emoji: '💃'),
+    Penalty(type: PenaltyType.freePass,   emoji: '🛡️'),
+    Penalty(type: PenaltyType.frenchKiss, emoji: '💋'),
+    Penalty(type: PenaltyType.dominator,  emoji: '👑'),
+    Penalty(type: PenaltyType.bodySway,   emoji: '🔄'),
   ];
 
   static Penalty fromIndex(int index) => all[index];
 
-  /// Weighted random index matching the React distribution.
+  /// Weighted random: 全场干杯10%, 养鱼半杯30%, 免死金牌40%, 其余各4%.
   static int rollIndex() {
-    final roll = _random.nextInt(100);
-    if (roll < 12) return 0;   // ALL_CHEERS (12%)
-    if (roll < 26) return 1;   // TEASE_SIP (14%)
-    if (roll < 38) return 2;   // BOTTOMS_UP (12%)
-    if (roll < 50) return 3;   // LAP_DANCE (12%)
-    if (roll < 62) return 4;   // FREE_PASS (12%)
-    if (roll < 76) return 5;   // KISS (14%)
-    if (roll < 88) return 6;   // DOMINATOR (12%)
-    return 7;                   // BODY_SWAY (12%)
-  }
-}
-
-final _random = _SimpleRandom();
-
-/// Minimal Deterministic-compatible random.
-class _SimpleRandom {
-  int _seed = DateTime.now().microsecondsSinceEpoch;
-  int nextInt(int max) {
-    _seed = (_seed * 1103515245 + 12345) & 0x7fffffff;
-    return _seed % max;
+    final roll = Random().nextInt(100);
+    if (roll < 10) return 0;   // ALL_CHEERS (10%)
+    if (roll < 40) return 1;   // TEASE_SIP (30%)
+    if (roll < 44) return 2;   // BOTTOMS_UP (4%)
+    if (roll < 48) return 3;   // LAP_DANCE (4%)
+    if (roll < 88) return 4;   // FREE_PASS (40%)
+    if (roll < 92) return 5;   // FRENCH_KISS (4%)
+    if (roll < 96) return 6;   // DOMINATOR (4%)
+    return 7;                   // BODY_SWAY (4%)
   }
 }

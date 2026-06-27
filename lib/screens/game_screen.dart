@@ -243,7 +243,7 @@ class _GameScreenState extends State<GameScreen> {
                       title: provider.getCustomName(state.selectedIndex!),
                       subtitle: i18n.penaltySubtitle(state.selectedIndex!),
                       description: i18n.penaltyDescription(state.selectedIndex!),
-                      colorHex: Penalty.fromIndex(state.selectedIndex!).colorHex,
+                      colorHex: Penalty.colorHex(state.selectedIndex!),
                       showPlayAgain: state.phase == GamePhase.result,
                       onPlayAgain: () {
                         provider.nextRound();

@@ -128,7 +128,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                             width: 4,
                             height: 28,
                             decoration: BoxDecoration(
-                              color: parseHex(p.colorHex),
+                              color: parseHex(Penalty.colorHex(i)),
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),

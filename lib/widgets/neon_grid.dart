@@ -35,7 +35,7 @@ class NeonGrid extends StatelessWidget {
           if (idx == -1) return const SizedBox.shrink(); // center slot
 
           final penalty = Penalty.fromIndex(idx);
-          final color = parseHex(penalty.colorHex);
+          final color = parseHex(Penalty.colorHex(idx));
           final isHighlighted = state.highlightedIndex == idx;
           final isSelected = state.selectedIndex == idx;
           final dimmed = state.selectedIndex != null && !isSelected;
@@ -67,7 +67,7 @@ class NeonGrid extends StatelessWidget {
   }
 
   Widget _buildCellContent(Penalty penalty, int idx, bool isHighlighted, bool isSelected, bool dimmed, I18n i18n) {
-    final color = parseHex(penalty.colorHex);
+    final color = parseHex(Penalty.colorHex(idx));
     final opacity = dimmed ? 0.3 : 1.0;
     final title = penalty.type == PenaltyType.dominator
         ? '👑'

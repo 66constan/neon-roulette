@@ -1,66 +1,44 @@
-# GATE 状态文件 — 霓虹轮盘 NEON ROULETTE
+# GATE 状态文件 — 霓虹轮盘 NEON ROULETTE v2.0
 
-> **最后更新:** 2026-06-25 15:00 UTC+8
-> **项目状态:** ✅ COMPLETE — 待 GitHub Push + Magic 云构建
+> **最后更新:** 2026-06-27
+> **项目状态:** ✅ REBUILT FROM REACT SOURCE — 待云构建
 > **负责人:** jiaweisi (AI CTO)
-
----
 
 ## 阶段状态
 
 | Gate | 状态 | 备注 |
 |------|------|------|
-| G1: PRD审查 | ✅ DONE | PRD.md 已写入并通过CEO方案逻辑审查 |
-| G2: Kanban拆解 | ✅ DONE | 18个任务，3个Phase串行推进 |
-| G3: Phase 1 基础层 | ✅ DONE | 数据模型+主题+状态机+服务+背景(2代理并行) |
-| G4: Phase 2 核心交互 | ✅ DONE | UI组件+主屏整合(1代理) |
-| G5: Phase 3 体验层 | ✅ DONE | 测试+README(1代理，发现并修复索引映射bug) |
-| G6: 审查验证 | ✅ DONE | 所有交付物通过审查 |
+| G1: React源码评估 | ✅ DONE | Google AI Studio生成，React 19+TypeScript+Tailwind |
+| G2: 数据模型翻译 | ✅ DONE | 加权概率、8惩罚项、4语翻译 |
+| G3: 音频合成引擎 | ✅ DONE | 纯Dart WAV合成，零音频文件 |
+| G4: UI组件 | ✅ DONE | 9宫格+充电条+能量球+指纹触控+设置面板+频闪 |
+| G5: 主屏整合 | ✅ DONE | GameScreen串联所有组件 |
+| G6: Web构建验证 | ✅ DONE | `flutter build web --release` 通过 |
 | G7: GitHub Push | ✅ DONE | https://github.com/66constan/neon-roulette |
-| G8: Magic云构建 | ⏳ PENDING | codemagic.yaml 已配置，需触发首次构建 |
+| G8: Magic云构建 | ⏳ PENDING | 准备触发 |
 
----
+## React→Flutter移植保留特性
 
-## 交付物清单
+| # | 特性 | 来源 |
+|---|------|------|
+| ✅ | 加权概率(14/14/12/12/12/14/10/12) | React rollTargetIndex |
+| ✅ | 8种惩罚：全场干杯/养鱼半杯/深水炸弹/贴身热舞/免死金牌/法式湿吻/绝对支配/欲擒故纵 | React translations |
+| ✅ | 纯程序化音效(WAV合成) | React AudioEngine (Web Audio → Dart WAV) |
+| ✅ | VinaHouse Drop 145BPM | React playVinaHouseDrop |
+| ✅ | 四语完整翻译(ZH/EN/VI/JA) | React translations.ts |
+| ✅ | 充电强度条(PWR) + 3枚能量球 | React charging bar + orbs |
+| ✅ | 中心长按旋转按钮 | React center trigger button |
+| ✅ | 底部指纹触摸区 | React fingerprint touch area |
+| ✅ | 动态环境光 | React ambientGlow |
+| ✅ | Settings面板(音效/语言/自定义) | React SettingsPanel |
+| ✅ | BGM背景节拍 | React toggleAmbientClubBGM |
+| ✅ | 胜利频闪(VinaDrop strobe) | React isDzoFlash |
+| ✅ | 屏幕抖动+触觉反馈 | React shake+vibrate |
 
-| 文件 | 行数 | 用途 |
-|------|------|------|
-| lib/main.dart | 40 | 入口，MaterialApp+Provider |
-| lib/models/game_state.dart | 67 | 状态机枚举+GameState不可变模型 |
-| lib/models/penalty.dart | 155 | 8种惩罚数据模型 |
-| lib/models/player.dart | 21 | 玩家模型 |
-| lib/theme/neon_theme.dart | 123 | 霓虹主题+颜色常量+发光工具 |
-| lib/providers/game_provider.dart | 205 | 核心状态机(ChangeNotifier) |
-| lib/services/audio_service.dart | 130 | 音效服务(audioplayers) |
-| lib/services/haptic_service.dart | 38 | 触觉反馈服务 |
-| lib/services/random_service.dart | 78 | 随机算法+跳格序列生成 |
-| lib/widgets/neon_background.dart | 246 | 霓虹粒子背景(40粒子,60fps) |
-| lib/widgets/neon_grid.dart | 181 | 9宫格布局+霓虹高亮 |
-| lib/widgets/center_button.dart | 214 | 中心长按按钮+脉冲动画 |
-| lib/widgets/penalty_card.dart | 142 | 惩罚结果卡片+弹入动画 |
-| lib/widgets/player_picker.dart | 258 | 挑人弹窗+10s倒计时 |
-| lib/widgets/bottom_bar.dart | 106 | 底部状态栏 |
-| lib/screens/game_screen.dart | 280 | 主屏整合+旋转动画 |
-| test/**/*.dart | 756 | 模型/Provider/Widget测试 |
-| **Dart 总计** | **3,051** | |
-| PRD.md / GATE.md / README.md | - | 文档 |
+## 决策记录
 
----
-
-## Bug 修复记录
-
-| # | Bug | 修复 |
-|---|-----|------|
-| F1 | penalty.dart 格子映射与CEO文档不一致（freePassNext错放在index1而非index7） | 重新排列索引顺序，与文档9宫格完全对齐 |
-| F2 | neon_grid.dart emoji映射同步错误 | 与penalty.dart同步修正 |
-| F3 | game_provider_test.dart 按旧映射编写测试 | QA阶段发现并全部修正 |
-
----
-
-## 关键设计决策
-
-- **等概率随机:** 每格12.5%，使用dart:math Random
-- **下局加倍:** 仅影响文案显示（不改变概率），halfDrink→fullDrink文案
-- **音频容错:** 所有播放try-catch包裹，无音频文件也不崩溃
-- **粒子背景:** 40粒子CustomPainter，三层辉光(外10/中4/核1.5px blur)
-- **旋转动画:** 23步序列，延迟50ms→300ms渐进减速，总长约2秒
+- **平台:** Flutter (非H5/PWA)，覆盖iOS/Android/Web
+- **状态管理:** Provider (轻量，够用)
+- **音效:** 纯Dart WAV合成 (替代React的Web Audio API)，使用audioplayers BytesSource播放
+- **网格布局:** 跟随React排列 (0-7重排：0全场干杯 1养鱼半杯 2深水炸弹 7欲擒故纵 3贴身热舞 6绝对支配 5法式湿吻 4免死金牌)
+- **选人方式:** React使用自动方向+序号(保留)，Flutter弹窗选人(原先)未移植 — 保持React风格
