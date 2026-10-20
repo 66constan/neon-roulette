@@ -28,7 +28,7 @@ workflows:
       - build/ios/iphoneos/neon-roulette-unsigned.ipa
     cache:
       cache_paths:
-        - /c/Users/chenw/.pub-cache
+        - $HOME/.pub-cache
         - ios/Pods
 
   android-debug:
