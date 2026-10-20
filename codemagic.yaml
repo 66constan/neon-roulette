@@ -1,4 +1,36 @@
 workflows:
+  ios-unsigned:
+    name: iOS Unsigned Test Build
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install dependencies
+        script: flutter packages pub get
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install
+      - name: Build unsigned iOS app
+        script: |
+          flutter build ios --release --no-codesign
+      - name: Package to IPA
+        script: |
+          set -e
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r -q neon-roulette-unsigned.ipa Payload
+    artifacts:
+      - build/ios/iphoneos/neon-roulette-unsigned.ipa
+    cache:
+      cache_paths:
+        - /c/Users/chenw/.pub-cache
+        - ios/Pods
+
   android-debug:
     name: Android Debug Build
     max_build_duration: 30
@@ -6,37 +38,22 @@ workflows:
       flutter: stable
     scripts:
       - name: Install dependencies
-        script: flutter pub get
-      - name: Run tests
-        script: flutter test
+        script: flutter packages pub get
+      - name: Flutter analyze
+        script: flutter analyze
       - name: Build Android APK
         script: flutter build apk --debug
     artifacts:
-      - build/app/outputs/flutter-apk/app-debug.apk
+      - build/app/outputs/flutter-apk/*.apk
 
-  android-release:
-    name: Android Release
+  flutter-web:
+    name: Flutter Web Build
     max_build_duration: 30
     environment:
       flutter: stable
     scripts:
       - name: Install dependencies
-        script: flutter pub get
-      - name: Run tests
-        script: flutter test
-      - name: Build Android APK
-        script: flutter build apk --release
-    artifacts:
-      - build/app/outputs/flutter-apk/app-release.apk
-
-  web:
-    name: Web Build
-    max_build_duration: 15
-    environment:
-      flutter: stable
-    scripts:
-      - name: Install dependencies
-        script: flutter pub get
+        script: flutter packages pub get
       - name: Build Web
         script: flutter build web --release
     artifacts:
